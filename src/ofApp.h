@@ -2,7 +2,7 @@
 
 #include "ofMain.h"
 #include "ofxGui.h"
-#include "ofxKinectV2.h"
+#include "ofxMultiKinectV2.h"
 #include "ofxCv.h"
 
 
@@ -10,16 +10,20 @@
 
 class ofApp : public ofBaseApp{
 
-    vector <shared_ptr<ofxKinectV2>> kinect;
-    vector <ofTexture> colorTex;
-    vector <ofTexture> depthTex;
+    vector <shared_ptr<ofxMultiKinectV2>> kinect;
+//    vector <ofTexture> colorTex;
+//    vector <ofTexture> depthTex;
+    vector <shared_ptr<ofPixels>> mapPix;
+    ofPixels depthPix;
     
     ofxCv::ContourFinder contourFinder;
-    ofShader depthShader;
+//    ofShader depthShader;
     ofTexture trimDepth;
     
     
-    ofxPanel panel;
+    ofxPanel kinectDistanceGui;
+    ofxIntSlider minDistance;
+    ofxIntSlider maxDistance;
     
     // GUI
     ofxPanel gui;

@@ -1,4 +1,6 @@
 ofxCv
 ofxGui
 ofxKinectV2
+ofxMultiKinectV2
 ofxOpenCv
+ofxTurboJpeg

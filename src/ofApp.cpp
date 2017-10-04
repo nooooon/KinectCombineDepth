@@ -6,31 +6,31 @@ void ofApp::setup(){
     ofSetVerticalSync(true);
     ofSetFrameRate(30);
     
-    ofxKinectV2 tmp;
-    vector<ofxKinectV2::KinectDeviceInfo> deviceList = tmp.getDeviceList();
+    ofxMultiKinectV2 tmp;
+    int count = ofxMultiKinectV2::getDeviceCount();
     
     // gui1
-    panel.setup("", "kinectList", 50, 50);
+    kinectDistanceGui.setup("", "kinectList", 50, 50);
+    kinectDistanceGui.add(minDistance.setup("minDistance", 1500, 0, 12000));
+    kinectDistanceGui.add(maxDistance.setup("maxDistance", 4000, 0, 12000));
     
-    kinect.resize(deviceList.size());
-    colorTex.resize(deviceList.size());
-    depthTex.resize(deviceList.size());
+    kinect.resize(count);
+//    colorTex.resize(count);
+//    depthTex.resize(count);
+    mapPix.resize(count);
     
-    string kinectId[2];
-    kinectId[0] = "004978762247";
-    kinectId[1] = "005990562247";
+//    string kinectId[2];
+//    kinectId[0] = "004978762247";
+//    kinectId[1] = "005990562247";
     
-    for(int i = 0; i < deviceList.size(); i++){
-        cout << i << endl;
-        kinect[i] = shared_ptr<ofxKinectV2>(new ofxKinectV2());
-        kinect[i]->open(kinectId[i]);
-        kinect[i]->minDistance = 1500;
-        kinect[i]->maxDistance = 3000;
+    for(int i = 0; i < count; i++){
         
-        panel.add(kinect[i]->params);
+        kinect[i] = shared_ptr<ofxMultiKinectV2>(new ofxMultiKinectV2());
+        kinect[i]->open(false, true, i);
+        
+        kinect[i]->start();
     }
     
-    cout << kinect.size() << endl;
     
     // gui
     gui.setup("", "kinect", 300, 50);
@@ -49,14 +49,36 @@ void ofApp::setup(){
 //--------------------------------------------------------------
 void ofApp::update(){
     
+    if(!kinect.size()){
+        return;
+    }
+    
     for(int i = 0; i < kinect.size(); i++){
         
         kinect[i]->update();
         
         if(kinect[i]->isFrameNew()){
             
-//            colorTex[i].loadData(kinect[i]->getRgbPixels());
-//            depthTex[i].loadData(kinect[i]->getDepthPixels());
+            ofFloatPixels rawDepthPixels = kinect[i]->getDepthPixelsRef();
+            
+            if(0 < rawDepthPixels.size()){
+                
+                if(depthPix.getWidth() != rawDepthPixels.getWidth()){
+                    depthPix.allocate(rawDepthPixels.getWidth(), rawDepthPixels.getHeight(), 1);
+                }
+                
+                unsigned char * pixels = depthPix.getData();
+                
+                for(int i = 0; i < depthPix.size(); i++){
+                    pixels[i] = ofMap(rawDepthPixels[i], minDistance, maxDistance, 255, 0, true);
+                    if( pixels[i] == 255 ){
+                        pixels[i] = 0;
+                    }
+                }
+                mapPix[i] = shared_ptr<ofPixels>(new ofPixels());
+                mapPix[i]->setFromPixels(pixels, rawDepthPixels.getWidth(), rawDepthPixels.getHeight(), 1);
+                //                depthTex[i].loadData(*mapPix[i]);
+            }
             
         }else{
             // frame error
@@ -66,11 +88,11 @@ void ofApp::update(){
     
     
     // left kinect
-    ofPixels pix = kinect[0]->getDepthPixels();
+    ofPixels pix = *mapPix[0];
     pix.crop(0, 0, 512 - jointMarginLeft, 424);
     
     // right kinect
-    ofPixels pix2 = kinect[1]->getDepthPixels();
+    ofPixels pix2 = *mapPix[1];
     pix2.crop(jointMarginRight, 0, 512 - jointMarginRight, 424);
     
     
@@ -96,11 +118,9 @@ void ofApp::update(){
         cropHeight = pixels.getHeight() - cropPositionY;
     }
     pixels.crop(cropPositionX, cropPositionY, cropWidth, cropHeight);
-//    cout << pixels.size() << endl;
     
     cv::Mat mat = cv::Mat(pixels.getHeight(), pixels.getWidth(), CV_8UC1, pixels.getData(), 0);
     
-    //cv::Mat mat = cv::Mat(414, 512, CV_8UC1, pix.getData(), 0);
     
     contourFinder.setMinAreaRadius(minRadius);
     contourFinder.setMaxAreaRadius(maxRadius);
@@ -114,10 +134,10 @@ void ofApp::draw(){
     ofSetColor(255);
     ofClear(255);
     
-    panel.draw();
+    kinectDistanceGui.draw();
     gui.draw();
     
-    for(int i = 0; i < kinect.size(); i++){
+//    for(int i = 0; i < kinect.size(); i++){
 //        if (colorTex[i].isAllocated()) {
 //            colorTex[i].draw(0, 0, 640, 360);
 //        }
@@ -126,7 +146,7 @@ void ofApp::draw(){
 //            depthTex[i].draw(512 * i, 360, 512, 424);
 //            depthShader.end();
 //        }
-    }
+//    }
     
     if (trimDepth.isAllocated()) {
         trimDepth.draw(0, 360, trimDepth.getWidth(), trimDepth.getHeight());
@@ -139,6 +159,7 @@ void ofApp::draw(){
     ofDrawRectangle(0, 0, cropWidth, cropHeight);
     
     ofSetHexColor(0xffff99);
+    ofFill();
     contourFinder.draw();
     
     
@@ -149,7 +170,6 @@ void ofApp::draw(){
             ofSetLineWidth(4);
             ofDrawLine(center.x, 0, center.x, 424);
             float pos = ofMap(center.x, 0, cropWidth, 0, 1);
-            cout << pos << endl;
         }
     }
     ofPopMatrix();
